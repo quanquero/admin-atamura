@@ -18,11 +18,42 @@ DOGOVOR_LOGS = os.environ.get("DOGOVOR_LOGS",
     os.path.join(os.path.dirname(BASE), "atamura-dogovor-bot", "logs", "generations"))
 FINANCE_URL = os.environ.get("FINANCE_URL", "").rstrip("/")
 FINANCE_KEY = os.environ.get("FINANCE_KEY", "")
+DOGOVOR_URL = os.environ.get("DOGOVOR_URL", "").rstrip("/")     # ЛК бота договоров (legal.atamura.group)
+METRICS_KEY = os.environ.get("METRICS_KEY", "")                 # X-Service-Key для /api/metrics.json
 BITRIX_WEBHOOK = os.environ.get("BITRIX_WEBHOOK", "").rstrip("/")
 _CTX = ssl.create_default_context(); _CTX.check_hostname = False; _CTX.verify_mode = ssl.CERT_NONE
 
 
-# ---------- источник: БОТ ДОГОВОРОВ → косяки инициаторов ----------
+# ---------- источник: БОТ ДОГОВОРОВ → живой снимок метрик (SQL-ядро) ----------
+def dogovor_metrics_live():
+    """Готовый снимок метрик из бота договоров (/api/metrics.json). Косячники — уже по фамилиям."""
+    if not (DOGOVOR_URL and METRICS_KEY):
+        return None
+    try:
+        req = urllib.request.Request(DOGOVOR_URL + "/api/metrics.json", headers={"X-Service-Key": METRICS_KEY})
+        d = json.load(urllib.request.urlopen(req, context=_CTX, timeout=25))
+        if d.get("error"):
+            return None
+        d["source"] = "live"
+        return d
+    except Exception:
+        return None
+
+
+def dogovor_snapshot():
+    """Живой снимок из бота договоров, иначе — фолбэк на локальные логи генераций (косяки по ID)."""
+    live = dogovor_metrics_live()
+    if live:
+        return live
+    k = dogovor_kosyaki()
+    return {"source": "logs", "dogovorov": k["total_zayavok"], "flagov": k["total_kosyakov"],
+            "chistyh": None, "podryadchikov": None, "saved_min": None, "saved_money": None,
+            "by_type": [], "by_company": [],
+            "kosyachniki": [{"initiator": r["initiator"], "n": r["kosyakov"]} for r in k["rows"]],
+            "rows": k["rows"], "files": k["files"]}
+
+
+# ---------- источник: БОТ ДОГОВОРОВ → косяки инициаторов (фолбэк из логов) ----------
 def _flag_kind(flag):
     """Грубая категория косяка (для группировки)."""
     t = str(flag or "").lower()
@@ -132,7 +163,7 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             if self.path == "/api/kosyaki":
-                self._send(json.dumps(dogovor_kosyaki(), ensure_ascii=False), "application/json")
+                self._send(json.dumps(dogovor_snapshot(), ensure_ascii=False), "application/json")
             elif self.path == "/api/finance":
                 self._send(json.dumps(finance_snapshot(), ensure_ascii=False), "application/json")
             elif self.path == "/healthz":
@@ -159,7 +190,9 @@ h2{font-size:15px;letter-spacing:.02em;margin:30px 0 12px;color:var(--ink)}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px}
 .tile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
 .tile .v{font-size:25px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-.tile .l{color:var(--ink2);font-size:12.5px;margin-top:4px}.tile .v.a{color:var(--accent)}
+.tile .l{color:var(--ink2);font-size:12.5px;margin-top:4px}.tile .v.a{color:var(--accent)}.tile .v.crit{color:var(--crit)}
+.track{height:6px;border-radius:4px;background:var(--panel2);overflow:hidden}
+.fill{height:100%;border-radius:4px;background:var(--accent)}.fill.hi{background:var(--crit)}
 .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:14px}
 .card h3{margin:0;padding:13px 16px;font-size:13.5px;border-bottom:1px solid var(--line);color:var(--ink2)}
 table{width:100%;border-collapse:collapse;font-size:13.5px}
@@ -198,21 +231,27 @@ fetch('/api/finance').then(function(r){return r.json();}).then(function(d){
 }).catch(function(e){document.getElementById('fin').innerHTML='ошибка: '+e;});
 fetch('/api/kosyaki').then(function(r){return r.json();}).then(function(d){
   var el=document.getElementById('kos');el.className='';
-  var rows=d.rows||[];
+  var kos=d.kosyachniki||[];
+  function tile(v,l,c){return '<div class=tile><div class="v'+(c?' '+c:'')+'">'+v+'</div><div class=l>'+esc(l)+'</div></div>';}
   var head='<div class=tiles style="margin-bottom:14px">'
-    +'<div class=tile><div class=v>'+d.total_zayavok+'</div><div class=l>заявок с генерацией</div></div>'
-    +'<div class=tile><div class="v" style=color:var(--crit)>'+d.total_kosyakov+'</div><div class=l>всего косяков</div></div>'
-    +'<div class=tile><div class=v>'+rows.length+'</div><div class=l>инициаторов</div></div></div>';
-  if(!rows.length){el.innerHTML=head+'<div class=note>Логов генераций не найдено ('+esc(d.source)+'). Появятся, когда бот договоров сформирует договоры.</div>';return;}
-  var body=rows.map(function(x){
-    var kinds=(x.kinds||[]).map(function(k){return '<span class=k><b>'+k.n+'</b> '+esc(k.kind)+'</span>';}).join(' · ');
-    return '<tr><td><b>'+esc(x.initiator)+'</b><div style="color:var(--muted);font-size:11px">id '+esc(x.initiator_id)+'</div></td>'
-      +'<td class=num>'+x.zayavok+'</td><td class=num><span class=badge>'+x.kosyakov+'</span></td>'
-      +'<td>'+esc(x.top_kind)+'</td><td>'+kinds+'</td></tr>';
-  }).join('');
-  el.innerHTML=head+'<div class=card><h3>Рейтинг по количеству косяков</h3>'
-    +'<table><thead><tr><th>Инициатор</th><th class=num>Заявок</th><th class=num>Косяков</th><th>Топ-косяк</th><th>Разбивка</th></tr></thead><tbody>'+body+'</tbody></table></div>'
-    +'<div class=note>Источник: логи генераций бота договоров ('+d.files+' файлов). Имена — из Bitrix (если задан вебхук), иначе ID.</div>';
+    +tile(d.dogovorov==null?'—':d.dogovorov,'договоров в ядре','')
+    +tile(d.chistyh==null?'—':d.chistyh,'чистых (без флагов)','')
+    +tile(d.flagov==null?'—':d.flagov,'флагов всего','crit')
+    +tile(d.saved_min==null?'—':(money(d.saved_min)+' мин'),'сэкономлено времени','a')
+    +tile(d.saved_money==null?'—':(money(d.saved_money)+' ₸'),'сэкономлено денег','a')
+    +'</div>';
+  // косячники по фамилиям
+  var kbody=kos.map(function(x,i){var w=kos[0]?Math.round(x.n/kos[0].n*100):0;
+    return '<tr><td><b>'+esc(x.initiator)+'</b></td><td class=num><span class=badge>'+x.n+'</span></td>'
+      +'<td style="width:45%"><div class=track><div class="fill'+(i===0?' hi':'')+'" style="width:'+w+'%"></div></div></td></tr>';}).join('');
+  var kcard=kos.length?('<div class=card><h3>🚩 Косячники — флагов по инициатору (для руководства)</h3>'
+    +'<table><thead><tr><th>Инициатор</th><th class=num>Флагов</th><th></th></tr></thead><tbody>'+kbody+'</tbody></table></div>'):
+    '<div class=note>Косячников нет данных.</div>';
+  // замечания по типам
+  var tb=(d.by_type||[]).map(function(t){return '<tr><td>'+esc(t.type)+'</td><td class=num>'+t.n+'</td></tr>';}).join('');
+  var tcard=(d.by_type&&d.by_type.length)?('<div class=card style="margin-top:14px"><h3>Замечания по типам — что чаще недозаполняют</h3><table><tbody>'+tb+'</tbody></table></div>'):'';
+  var src=d.source==='live'?'живой снимок из SQL-ядра бота договоров':('локальные логи ('+(d.files||0)+' файлов) — подключи DOGOVOR_URL+METRICS_KEY для живых цифр и фамилий');
+  el.innerHTML=head+kcard+tcard+'<div class=note>Источник: '+esc(src)+'.</div>';
 }).catch(function(e){document.getElementById('kos').innerHTML='ошибка: '+e;});
 </script></body></html>"""
 
