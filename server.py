@@ -129,19 +129,17 @@ def _bx_names(ids):
 
 # ---------- источник: ФИНБЛОК → финсводка (снимок по HTTP) ----------
 def finance_snapshot():
-    if not FINANCE_URL:
-        return {"connected": False, "hint": "Задай FINANCE_URL (+ FINANCE_KEY), чтобы подтянуть финсводку."}
+    if not (FINANCE_URL and FINANCE_KEY):
+        return {"connected": False, "hint": "Задай FINANCE_URL + FINANCE_KEY (SERVICE_KEY финблока), чтобы подтянуть финсводку."}
     try:
-        req = urllib.request.Request(FINANCE_URL + "/data.json",
-                                     headers={"X-Service-Key": FINANCE_KEY} if FINANCE_KEY else {})
-        d = json.load(urllib.request.urlopen(req, context=_CTX, timeout=25))
+        req = urllib.request.Request(FINANCE_URL + "/api/metrics.json", headers={"X-Service-Key": FINANCE_KEY})
+        d = json.load(urllib.request.urlopen(req, context=_CTX, timeout=30))
+        if d.get("error"):
+            return {"connected": False, "error": d["error"]}
     except Exception as e:
         return {"connected": False, "error": str(e)[:160], "hint": "Финблок недоступен по FINANCE_URL."}
-    series = d.get("series", []); counts = d.get("counts", {}); meta = d.get("meta", {})
-    out_sum = sum(s.get("out", 0) for s in series); in_sum = sum(s.get("in", 0) for s in series)
-    return {"connected": True, "otток": out_sum, "приток": in_sum, "saldo": in_sum - out_sum,
-            "matched": counts.get("matched"), "reserve": counts.get("reserve"),
-            "nz_orphan": counts.get("nz_orphan"), "ts": meta.get("ts"), "months": meta.get("months")}
+    d["connected"] = True
+    return d
 
 
 # ---------- HTTP ----------
@@ -216,18 +214,19 @@ td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}tr:l
 <script>
 var money=function(n){return (Math.round(n||0)).toLocaleString('ru-RU').replace(/,/g,' ');};
 var esc=function(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');};
+function tileC(c,v,l){return '<div class=tile><div class="v '+(c||'')+'">'+v+'</div><div class=l>'+esc(l)+'</div></div>';}
 fetch('/api/finance').then(function(r){return r.json();}).then(function(d){
   var el=document.getElementById('fin');
   if(!d.connected){el.className='note';el.innerHTML='Финблок не подключён. '+esc(d.hint||d.error||'');return;}
   el.className='';
   el.innerHTML='<div class=tiles>'
-    +tile('a',money(d.otток)+' ₸','Отток за '+(d.months||'?')+' мес')
-    +tile('',money(d.приток)+' ₸','Приток')
-    +tile((d.saldo>=0?'':'a'),(d.saldo>=0?'+':'')+money(d.saldo)+' ₸','Сальдо')
-    +tile('',(d.matched==null?'—':d.matched),'Оплачено (матч 1С)')
-    +tile('',(d.reserve==null?'—':d.reserve),'Ждёт 1С')
+    +tileC('a',money(d.ottok)+' ₸','Отток за '+(d.months||'?')+' мес')
+    +tileC('',money(d.pritok)+' ₸','Приток')
+    +tileC((d.saldo>=0?'':'crit'),(d.saldo>=0?'+':'')+money(d.saldo)+' ₸','Сальдо')
+    +tileC('',(d.matched==null?'—':d.matched),'Оплачено (матч 1С)')
+    +tileC('crit',(d.reserve==null?'—':d.reserve),'Ждёт 1С')
+    +tileC('',(d.nz_orphan==null?'—':d.nz_orphan),'Оплата без заявки')
     +'</div>';
-  function tile(a,v,l){return '<div class=tile><div class="v '+(a?'a':'')+'">'+v+'</div><div class=l>'+esc(l)+'</div></div>';}
 }).catch(function(e){document.getElementById('fin').innerHTML='ошибка: '+e;});
 fetch('/api/kosyaki').then(function(r){return r.json();}).then(function(d){
   var el=document.getElementById('kos');el.className='';
