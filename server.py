@@ -16,14 +16,17 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 
 
 def _load_env():
-    """Подхватить .env рядом с server.py (секреты — в файле, не в коде/гите). chmod 600."""
+    """Подхватить .env рядом с server.py (секреты — в файле, не в коде/гите). chmod 600.
+    Если systemd уже задал env (EnvironmentFile) или файл недоступен — просто пропускаем."""
     p = os.path.join(BASE, ".env")
-    if os.path.exists(p):
+    try:
         for line in open(p, encoding="utf-8"):
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
                 os.environ.setdefault(k.strip(), v.strip())
+    except Exception:
+        pass
 
 
 _load_env()
