@@ -222,10 +222,10 @@ fetch('/api/finance').then(function(r){return r.json();}).then(function(d){
   el.innerHTML='<div class=tiles>'
     +tileC('a',money(d.ottok)+' ₸','Отток за '+(d.months||'?')+' мес')
     +tileC('',money(d.pritok)+' ₸','Приток')
-    +tileC((d.saldo>=0?'':'crit'),(d.saldo>=0?'+':'')+money(d.saldo)+' ₸','Сальдо')
+    +tileC((d.saldo>=0?'':'crit'),(d.saldo>=0?'+':'')+money(d.saldo)+' ₸','Сальдо (приток−отток)')
+    +tileC('',money(d.supplier_pay)+' ₸','Оплаты поставщикам')
     +tileC('',(d.matched==null?'—':d.matched),'Оплачено (матч 1С)')
-    +tileC('crit',(d.reserve==null?'—':d.reserve),'Ждёт 1С')
-    +tileC('',(d.nz_orphan==null?'—':d.nz_orphan),'Оплата без заявки')
+    +tileC('',(d.reserve==null?'—':d.reserve),'Ждёт 1С (за 3 мес)')
     +'</div>';
 }).catch(function(e){document.getElementById('fin').innerHTML='ошибка: '+e;});
 fetch('/api/kosyaki').then(function(r){return r.json();}).then(function(d){
@@ -257,6 +257,7 @@ fetch('/api/kosyaki').then(function(r){return r.json();}).then(function(d){
 
 if __name__ == "__main__":
     print(f"ATAMŪRA Core · кокпит → http://127.0.0.1:{PORT}")
-    print(f"  договоры: {DOGOVOR_LOGS}")
-    print(f"  финблок:  {FINANCE_URL or '(не задан FINANCE_URL)'}")
+    print(f"  договоры URL: {DOGOVOR_URL or '(НЕ задан → фолбэк на логи ' + DOGOVOR_LOGS + ')'}")
+    print(f"  METRICS_KEY:  {'задан' if METRICS_KEY else 'НЕ задан'}")
+    print(f"  финблок URL:  {FINANCE_URL or '(НЕ задан FINANCE_URL)'} · ключ: {'задан' if FINANCE_KEY else 'нет'}")
     ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()
