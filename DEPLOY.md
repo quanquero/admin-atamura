@@ -1,4 +1,4 @@
-# Деплой ATAMŪRA Core на admin.atamura.group (94.131.94.239)
+# Деплой ATAMŪRA Core на administrator.atamura.group (94.131.94.239)
 
 Кокпит читает снимки продуктов по HTTPS (dogovor/finance публичные), поэтому может жить на **любом**
 сервере с интернетом. Ставим на admin-сервер, за basic-auth (внутри — управленческие данные,
@@ -41,15 +41,15 @@ curl -s http://127.0.0.1:8090/api/kosyaki | head -c 120     # проверка: 
 sudo apt install -y apache2-utils
 sudo htpasswd -c /etc/nginx/.htpasswd-admin admin      # задать пароль
 
-sudo cp deploy/nginx-admin.conf /etc/nginx/sites-available/admin.atamura.group
-sudo ln -s /etc/nginx/sites-available/admin.atamura.group /etc/nginx/sites-enabled/
+sudo cp deploy/nginx-admin.conf /etc/nginx/sites-available/administrator.atamura.group
+sudo ln -s /etc/nginx/sites-available/administrator.atamura.group /etc/nginx/sites-enabled/
 sudo nginx -t && sudo systemctl reload nginx
 
-# TLS (DNS admin.atamura.group уже указывает на этот сервер)
-sudo certbot --nginx -d admin.atamura.group
+# TLS (DNS administrator.atamura.group уже указывает на этот сервер)
+sudo certbot --nginx -d administrator.atamura.group
 ```
 
-Готово: **https://admin.atamura.group** (спросит логин/пароль) → кокпит на живых данных.
+Готово: **https://administrator.atamura.group** (спросит логин/пароль) → кокпит на живых данных.
 
 ## Обновление
 
