@@ -218,7 +218,7 @@ td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}tr:l
 </style></head><body>
 <div class=top><div class=glyph><span></span><span></span><span></span><span></span></div>
 <div><b>ATAMŪRA CORE</b><small>КОКПИТ</small></div>
-<span style="margin-left:auto;color:var(--muted);font-size:12px">читает снимки продуктов · логику не дублирует</span></div>
+<span style="margin-left:auto;color:var(--muted);font-size:12px"><span id=upd></span> · читает снимки продуктов · логику не дублирует</span></div>
 <div class=wrap>
   <p class=eyebrow>Финблок</p><h2 style="margin-top:2px">Финансовая сводка</h2>
   <div id=fin class=note>загрузка…</div>
@@ -229,7 +229,7 @@ td{padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}tr:l
 var money=function(n){return (Math.round(n||0)).toLocaleString('ru-RU').replace(/,/g,' ');};
 var esc=function(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;');};
 function tileC(c,v,l){return '<div class=tile><div class="v '+(c||'')+'">'+v+'</div><div class=l>'+esc(l)+'</div></div>';}
-fetch('/api/finance').then(function(r){return r.json();}).then(function(d){
+function loadFinance(){fetch('/api/finance').then(function(r){return r.json();}).then(function(d){
   var el=document.getElementById('fin');
   if(!d.connected){el.className='note';el.innerHTML='Финблок не подключён. '+esc(d.hint||d.error||'');return;}
   el.className='';
@@ -241,8 +241,8 @@ fetch('/api/finance').then(function(r){return r.json();}).then(function(d){
     +tileC('',(d.matched==null?'—':d.matched),'Оплачено (матч 1С)')
     +tileC('',(d.reserve==null?'—':d.reserve),'Ждёт 1С (за 3 мес)')
     +'</div>';
-}).catch(function(e){document.getElementById('fin').innerHTML='ошибка: '+e;});
-fetch('/api/kosyaki').then(function(r){return r.json();}).then(function(d){
+}).catch(function(e){document.getElementById('fin').innerHTML='ошибка: '+e;});}
+function loadKosyaki(){fetch('/api/kosyaki').then(function(r){return r.json();}).then(function(d){
   var el=document.getElementById('kos');el.className='';
   var kos=d.kosyachniki||[];
   function tile(v,l,c){return '<div class=tile><div class="v'+(c?' '+c:'')+'">'+v+'</div><div class=l>'+esc(l)+'</div></div>';}
@@ -265,7 +265,9 @@ fetch('/api/kosyaki').then(function(r){return r.json();}).then(function(d){
   var tcard=(d.by_type&&d.by_type.length)?('<div class=card style="margin-top:14px"><h3>Замечания по типам — что чаще недозаполняют</h3><table><tbody>'+tb+'</tbody></table></div>'):'';
   var src=d.source==='live'?'живой снимок из SQL-ядра бота договоров':('локальные логи ('+(d.files||0)+' файлов) — подключи DOGOVOR_URL+METRICS_KEY для живых цифр и фамилий');
   el.innerHTML=head+kcard+tcard+'<div class=note>Источник: '+esc(src)+'.</div>';
-}).catch(function(e){document.getElementById('kos').innerHTML='ошибка: '+e;});
+}).catch(function(e){document.getElementById('kos').innerHTML='ошибка: '+e;});}
+function refreshAll(){loadFinance();loadKosyaki();var t=document.getElementById('upd');if(t)t.textContent='обновлено '+new Date().toLocaleTimeString('ru-RU').slice(0,5);}
+refreshAll();setInterval(refreshAll,60000);   // авто-обновление раз в минуту
 </script></body></html>"""
 
 
