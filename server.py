@@ -13,6 +13,20 @@ from collections import defaultdict
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 BASE = os.path.dirname(os.path.abspath(__file__))
+
+
+def _load_env():
+    """Подхватить .env рядом с server.py (секреты — в файле, не в коде/гите). chmod 600."""
+    p = os.path.join(BASE, ".env")
+    if os.path.exists(p):
+        for line in open(p, encoding="utf-8"):
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                k, v = line.split("=", 1)
+                os.environ.setdefault(k.strip(), v.strip())
+
+
+_load_env()
 PORT = int(os.environ.get("CORE_PORT", "8090"))
 DOGOVOR_LOGS = os.environ.get("DOGOVOR_LOGS",
     os.path.join(os.path.dirname(BASE), "atamura-dogovor-bot", "logs", "generations"))

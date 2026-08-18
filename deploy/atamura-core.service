@@ -1,0 +1,15 @@
+[Unit]
+Description=ATAMURA Core cockpit
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/atamura-core
+EnvironmentFile=/opt/atamura-core/.env
+ExecStart=/usr/bin/python3 server.py
+Restart=on-failure
+RestartSec=3
+User=www-data
+
+[Install]
+WantedBy=multi-user.target
